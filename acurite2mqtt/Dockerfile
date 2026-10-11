@@ -1,3 +1,13 @@
+FROM ghcr.io/home-assistant/base:latest AS builder
+
+RUN apk add --no-cache build-base cmake git pkgconf libusb-dev openssl-dev && \
+    (apk add --no-cache rtl-sdr-dev || apk add --no-cache librtlsdr-dev)
+
+RUN git clone --depth 1 https://github.com/merbanan/rtl_433.git /src/rtl_433 && \
+    cmake -S /src/rtl_433 -B /src/rtl_433/build -DCMAKE_BUILD_TYPE=Release && \
+    cmake --build /src/rtl_433/build -j2 && \
+    DESTDIR=/out cmake --install /src/rtl_433/build
+
 FROM ghcr.io/home-assistant/base:latest
 
 # Define environment variables
@@ -25,11 +35,14 @@ WORKDIR /data
 
 # Copy scripts
 COPY entry.sh rtl_433_mqtt_hass.py /scripts/
-# install rtl_433, rtl-sdr, libusb, mosquitto-clients, python3 py3-paho-mqtt; and deps of rtl_433_mqtt_hass.py.
-# make entry.sh and rtl_433_mqtt_hass.py executable.
-RUN apk add --no-cache rtl-sdr rtl_433 libusb mosquitto-clients python3 py3-paho-mqtt && \
+
+# Runtime packages (rtl_433 itself is compiled in the first stage)
+RUN apk add --no-cache rtl-sdr libusb openssl mosquitto-clients python3 py3-paho-mqtt && \
     chmod +x /scripts/entry.sh && \
     chmod +x /scripts/rtl_433_mqtt_hass.py
+
+# Newest rtl_433 built from source
+COPY --from=builder /out/usr/local/ /usr/local/
 
 # Execute entry script
 ENTRYPOINT [ "/scripts/entry.sh" ]
