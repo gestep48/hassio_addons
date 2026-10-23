@@ -3,8 +3,13 @@ FROM ghcr.io/home-assistant/base:latest AS builder
 RUN apk add --no-cache build-base cmake git pkgconf libusb-dev openssl-dev && \
     (apk add --no-cache rtl-sdr-dev || apk add --no-cache librtlsdr-dev)
 
-RUN git clone --depth 1 https://github.com/merbanan/rtl_433.git /src/rtl_433 && \
-    cmake -S /src/rtl_433 -B /src/rtl_433/build -DCMAKE_BUILD_TYPE=Release && \
+RUN git clone --depth 1 https://github.com/merbanan/rtl_433.git /src/rtl_433
+
+# TEMPORARY: Detlef's Optimus 6-in-1 decoder (rtl_433 #3729) until the official fix is merged.
+# To go back to stock rtl_433, delete this COPY line and the acurite.c file in this folder.
+COPY acurite.c /src/rtl_433/src/devices/acurite.c
+
+RUN cmake -S /src/rtl_433 -B /src/rtl_433/build -DCMAKE_BUILD_TYPE=Release && \
     cmake --build /src/rtl_433/build -j2 && \
     DESTDIR=/out cmake --install /src/rtl_433/build
 
